@@ -2,6 +2,8 @@
 
 This project was developed at the MIT Media Lab as part of the Latent Lab initiative. It explores time series forecasting using machine learning models, embeddings, and visualization tools.
 
+[Latent Lab – MIT Media Lab](https://www.media.mit.edu/projects/latent-lab/overview/)
+
 ## Initial testing
 
 - Forecasts time series data using pretrained models
