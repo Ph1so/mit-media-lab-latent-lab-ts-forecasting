@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 from nomic import embed
 
 load_dotenv()
-API_TOKEN = os.getenv('API-READ-ACCESS-TOKEN')
+API_TOKEN = os.getenv('API_READ_ACCESS_TOKEN')
 MOVIE_GENRES = {
     28: "Action",
     12: "Adventure",
