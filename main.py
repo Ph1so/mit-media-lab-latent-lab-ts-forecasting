@@ -113,7 +113,7 @@ def load_media_data(filepath):
     """Load and preprocess movie data."""
     df = pd.read_csv(filepath)
     df.dropna(subset=['Title', 'Summary', 'Genre'], inplace=True)
-    return df['Title'].tolist(), df['Summary'].tolist(), df['Genre'].tolist()
+    return df['Title'].tolist(), df['Summary'].tolist(), df['Genre'].tolist(), df['Date'].tolist()
 
 def embed_texts(texts):
     """Embed a list of texts using Nomic's embedding model."""
@@ -164,11 +164,80 @@ def visualize_embeddings(titles, genres, embeddings, query_emb, interstellar_emb
 
 def main():
     authenticate_tmdb()
-    titles, summaries, genres = load_media_data("processed_netflix.csv")
-    media_type = set()
-    for movie_title in titles:
-        print(movie_title)      
+    titles, summaries, genres, date = load_media_data("processed_netflix.csv")
+    num_none = 0
+    media_type = {
+        "movie": 0,
+        "tv": 0,
+        "tv_episodes": 0,
+        "tv_seasons": 0
+    }
+    unique_series = set()
+    for i, movie_title in enumerate(titles):
+        print(movie_title)
+        parts = movie_title.split(":")
+        if len(parts) >= 3 and "Season" in parts[1]:
+            # Likely a deep episode, keep Series + Season
+            name = ":".join(parts[:2]).strip()
+        elif len(parts) == 2 and "Episode" in parts[1]:
+            name = ":".join(parts[:1]).strip()
+        else:
+            name = parts[0].strip()
+        unique_series.add(name)
+        titles[i] = name
         data = get_media_data(movie_title)
+        if data == None:
+            num_none += 1
+            continue
+        if data.get("movie_results"):
+            media_type["movie"] += 1
+        elif data.get("tv_results"):
+            media_type["tv"] += 1
+        elif data.get("tv_episode_results"):
+            media_type["tv_episodes"] += 1
+        elif data.get("tv_season_results"):
+            media_type["tv_seasons"] += 1
+    print("media_types: ", media_type)
+    print(unique_series)
+    print("percent of media with no overview: ", num_none/len(titles)*100, "%")
+
+    media_type = {
+        "movie": 0,
+        "tv": 0,
+        "tv_episodes": 0,
+        "tv_seasons": 0
+    }
+    num_none = 0
+    num_overviews = 0
+    nones = []
+    for movie_title in unique_series:
+        print(movie_title)
+        data = get_media_data(movie_title)
+        if data == None:
+            num_none += 1
+            nones.append(movie_title)
+            continue
+        if data.get("movie_results"):
+            media_type["movie"] += 1
+            if data.get("movie_results")[0].get("overview"):
+                num_overviews += 1
+        elif data.get("tv_results"):
+            media_type["tv"] += 1
+            if data.get("tv_results")[0].get("overview"):
+                num_overviews += 1
+        elif data.get("tv_episode_results"):
+            media_type["tv_episodes"] += 1
+            if data.get("tv_episode_results")[0].get("overview"):
+                num_overviews += 1
+        elif data.get("tv_season_results"):
+            media_type["tv_seasons"] += 1
+            if data.get("tv_season_results")[0].get("overview"):
+                num_overviews += 1
+    
+    print("unique media_types: ", media_type)
+    print("percent of unique media with no search results: ", num_none/len(unique_series)*100, "%")
+    print("media with no overview: ", num_overviews/len(unique_series)*100, "%")
+
         # if movie_data:
         #     print(movie_data)
         #     movie_data = movie_data["movie_results"][0]["media_type"]
