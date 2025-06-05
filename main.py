@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 from nomic import embed
 
 load_dotenv()
-API_TOKEN = os.getenv('API_READ_ACCESS_TOKEN')
+TMDB_API_TOKEN = os.getenv('TMDB_API_READ_ACCESS_TOKEN')
 MOVIE_GENRES = {
     28: "Action",
     12: "Adventure",
@@ -56,7 +56,7 @@ def authenticate_tmdb():
     url = "https://api.themoviedb.org/3/authentication"
     headers = {
         "accept": "application/json",
-        "Authorization": f"Bearer {API_TOKEN}"
+        "Authorization": f"Bearer {TMDB_API_TOKEN}"
     }
     response = requests.get(url, headers=headers)
     print("TMDB Auth Response:", response.text)
@@ -95,7 +95,7 @@ def get_movie_data(title):
     url = f"https://api.themoviedb.org/3/find/{movie_id}?external_source={source_id}"
     headers = {
         "accept": "application/json",
-        "Authorization": f"Bearer {API_TOKEN}"
+        "Authorization": f"Bearer {TMDB_API_TOKEN}"
     }
     return requests.get(url, headers=headers).json()
 
