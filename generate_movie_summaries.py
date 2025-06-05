@@ -75,3 +75,4 @@ class NetflixSummarizer:
         df["Summary"], df["Genre"] = zip(*results)
         df.to_csv(self.output_csv, index=False)
         print(f"Done—wrote {self.output_csv}")
+        return(df)
