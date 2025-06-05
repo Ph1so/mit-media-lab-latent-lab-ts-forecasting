@@ -1,0 +1,7 @@
+nomic
+numpy
+scikit-learn
+matplotlib
+pandas
+requests
+python-dotenv
