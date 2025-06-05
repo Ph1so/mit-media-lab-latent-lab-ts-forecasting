@@ -53,8 +53,10 @@ TV_GENRES = {
     37: "Western"
 }
 
+P31_IDS: {'Q63952888', 'Q17517379', 'Q21191270', 'Q20650540', 'Q526877', 'Q3464665', 'Q11424', 'Q21198342', 'Q12737077', 'Q5398426', 'Q117467246', 'Q431289', 'Q1259759'}
+
+# --- API Wrappers ---
 def authenticate_tmdb():
-    """Authenticate with TMDB API."""
     url = "https://api.themoviedb.org/3/authentication"
     headers = {
         "accept": "application/json",
@@ -62,7 +64,6 @@ def authenticate_tmdb():
     }
     response = requests.get(url, headers=headers)
     print("TMDB Auth Response:", response.text)
-
 
 def wikidata_search(query):
     url = "https://www.wikidata.org/w/api.php"
@@ -73,181 +74,151 @@ def wikidata_search(query):
         "srsearch": query,
         "srnamespace": 0
     }
-
     response = requests.get(url, params=params)
     data = response.json()
-
-    if data.get("query", {}).get("search"):
-        result = data["query"]["search"][0]
+    results = data.get("query", {}).get("search")
+    if results:
+        result = results[0]
         return {
             "title": result["title"],
             "snippet": result.get("snippet", ""),
             "url": f"https://www.wikidata.org/wiki/{result['title'].replace(' ', '_')}"
         }
-    else:
-        return None
-    
+    return None
+
+def get_wiki_entity_metadata(entity_id):
+    url = f"https://www.wikidata.org/wiki/Special:EntityData/{entity_id}.json"
+    response = requests.get(url)
+    return response.json()['entities'].get(entity_id)
+
+def get_wiki_id(title):
+    result = wikidata_search(title)
+    return result["title"] if result else None
+
 def get_media_data(title):
-    movie_id = wikidata_search(title)
-    if movie_id:
-        movie_id = movie_id["title"]
-    else:
-        return None
-    source_id = 'wikidata_id'
-    url = f"https://api.themoviedb.org/3/find/{movie_id}?external_source={source_id}"
+    wiki_id = get_wiki_id(title)
+    if not wiki_id:
+        print(f"⚠️ No Wikidata ID found for: {title}")
+        return {}
+    url = f"https://api.themoviedb.org/3/find/{wiki_id}?external_source=wikidata_id"
     headers = {
         "accept": "application/json",
         "Authorization": f"Bearer {TMDB_API_TOKEN}"
     }
     return requests.get(url, headers=headers).json()
 
-def get_media_genres(ids, media_type):
-    genres = []
-    for id in ids:
-        if media_type == "movie":
-            genres.append(MOVIE_GENRES[id])
-        else:
-            genres.append(TV_GENRES[id])
-
+# --- Data Handling ---
 def load_media_data(filepath):
-    """Load and preprocess movie data."""
     df = pd.read_csv(filepath)
     df.dropna(subset=['Title', 'Summary', 'Genre'], inplace=True)
     return df['Title'].tolist(), df['Summary'].tolist(), df['Genre'].tolist(), df['Date'].tolist()
 
 def embed_texts(texts):
-    """Embed a list of texts using Nomic's embedding model."""
     return np.array(embed.text(texts=texts, model="nomic-embed-text-v1")['embeddings'])
 
-def visualize_embeddings(titles, genres, embeddings, query_emb, interstellar_emb):
-    """Visualize movie embeddings, coloring by genre."""
-    all_embeddings = np.vstack([embeddings, interstellar_emb, query_emb])
+def visualize_embeddings(titles, genres, embeddings, query_emb, ref_emb, ref_name="Reference"):
+    all_embeddings = np.vstack([embeddings, ref_emb, query_emb])
     reduced = PCA(n_components=2).fit_transform(all_embeddings)
 
-    corpus_2d = reduced[:-2]
-    interstellar_2d = reduced[-2]
-    query_2d = reduced[-1]
-
-    # Assign colors to genres
-    unique_genres = sorted(set(genres))
-    cmap = cm.get_cmap('tab20', len(unique_genres))
-    genre_colors = {genre: cmap(i) for i, genre in enumerate(unique_genres)}
+    corpus_2d, ref_2d, query_2d = reduced[:-2], reduced[-2], reduced[-1]
+    cmap = cm.get_cmap('tab20', len(set(genres)))
+    genre_colors = {genre: cmap(i) for i, genre in enumerate(sorted(set(genres)))}
     colors = [genre_colors[g] for g in genres]
 
-    # Plot
     plt.figure(figsize=(20, 20))
     plt.scatter(corpus_2d[:, 0], corpus_2d[:, 1], c=colors)
     for i, title in enumerate(titles):
         plt.annotate(title, (corpus_2d[i, 0], corpus_2d[i, 1]), fontsize=8)
-
-    plt.scatter(query_2d[0], query_2d[1], color='red', label='Query', marker='x', s=100)
+    plt.scatter(query_2d[0], query_2d[1], color='red', marker='x', s=100)
     plt.annotate("Query", query_2d, fontsize=10, color='red')
-
-    plt.scatter(interstellar_2d[0], interstellar_2d[1], color='green', label='Interstellar', marker='x', s=100)
-    plt.annotate("Interstellar", interstellar_2d, fontsize=10, color='green')
-
-    legend_elements = [
-        plt.Line2D([0], [0], marker='o', color='w', label=genre,
-                   markerfacecolor=color, markersize=8)
-        for genre, color in genre_colors.items()
-    ]
-    plt.legend(handles=legend_elements, bbox_to_anchor=(1.05, 1), loc='upper left', title="Genres")
-
-    plt.title("2D Visualization of Movie Embeddings by Genre")
-    plt.xlabel("PCA Component 1")
-    plt.ylabel("PCA Component 2")
+    plt.scatter(ref_2d[0], ref_2d[1], color='green', marker='x', s=100)
+    plt.annotate(ref_name, ref_2d, fontsize=10, color='green')
+    
+    legend = [plt.Line2D([0], [0], marker='o', color='w', label=genre, markerfacecolor=color, markersize=8)
+              for genre, color in genre_colors.items()]
+    plt.legend(handles=legend, bbox_to_anchor=(1.05, 1), loc='upper left', title="Genres")
+    plt.title("2D Visualization of Media Embeddings")
     plt.grid(True)
     plt.tight_layout()
-    plt.xlim(-0.15, 0)
-    plt.ylim(-0.15, 0)
     plt.show()
 
+# --- Main Pipeline ---
 def main():
     authenticate_tmdb()
-    titles, summaries, genres, date = load_media_data("processed_netflix.csv")
-    num_none = 0
-    media_type = {
-        "movie": 0,
-        "tv": 0,
-        "tv_episodes": 0,
-        "tv_seasons": 0
-    }
+    titles, summaries, genres, dates = load_media_data("processed_netflix.csv")
+
     unique_series = set()
-    for i, movie_title in enumerate(titles):
-        print(movie_title)
-        parts = movie_title.split(":")
+    for i, title in enumerate(titles):
+        parts = title.split(":")
         if len(parts) >= 3 and "Season" in parts[1]:
-            # Likely a deep episode, keep Series + Season
-            name = ":".join(parts[:2]).strip()
+            clean_title = ":".join(parts[:2]).strip()
         elif len(parts) == 2 and "Episode" in parts[1]:
-            name = ":".join(parts[:1]).strip()
+            clean_title = parts[0].strip()
         else:
-            name = parts[0].strip()
-        unique_series.add(name)
-        titles[i] = name
-        data = get_media_data(movie_title)
-        if data == None:
-            num_none += 1
+            clean_title = parts[0].strip()
+        unique_series.add(clean_title)
+        titles[i] = clean_title
+
+    type_counts = {"movie": 0, "tv": 0, "tv_episode": 0, "tv_season": 0}
+    failed_titles = []
+    overviews_found = 0
+    unique_entry_item_ids = set()
+    for title in unique_series:
+        print(f"Querying: {title}")
+        data = get_media_data(title)
+        if not data:
+            failed_titles.append(title)
             continue
-        if data.get("movie_results"):
-            media_type["movie"] += 1
-        elif data.get("tv_results"):
-            media_type["tv"] += 1
-        elif data.get("tv_episode_results"):
-            media_type["tv_episodes"] += 1
-        elif data.get("tv_season_results"):
-            media_type["tv_seasons"] += 1
-    print("media_types: ", media_type)
-    print(unique_series)
-    print("percent of media with no overview: ", num_none/len(titles)*100, "%")
 
-    media_type = {
-        "movie": 0,
-        "tv": 0,
-        "tv_episodes": 0,
-        "tv_seasons": 0
-    }
-    num_none = 0
-    num_overviews = 0
-    nones = []
-    for movie_title in unique_series:
-        print(movie_title)
-        data = get_media_data(movie_title)
-        if data == None:
-            num_none += 1
-            nones.append(movie_title)
-            continue
-        if data.get("movie_results"):
-            media_type["movie"] += 1
-            if data.get("movie_results")[0].get("overview"):
-                num_overviews += 1
-        elif data.get("tv_results"):
-            media_type["tv"] += 1
-            if data.get("tv_results")[0].get("overview"):
-                num_overviews += 1
-        elif data.get("tv_episode_results"):
-            media_type["tv_episodes"] += 1
-            if data.get("tv_episode_results")[0].get("overview"):
-                num_overviews += 1
-        elif data.get("tv_season_results"):
-            media_type["tv_seasons"] += 1
-            if data.get("tv_season_results")[0].get("overview"):
-                num_overviews += 1
-    
-    print("unique media_types: ", media_type)
-    print("percent of unique media with no search results: ", num_none/len(unique_series)*100, "%")
-    print("media with no overview: ", num_overviews/len(unique_series)*100, "%")
+        for key in ["movie_results", "tv_results", "tv_episode_results", "tv_season_results"]:
+            if key in data and data[key]:
+                type = key.replace("_results", "")
+                type_counts[type] += 1
+                if data[key][0].get("overview"):
+                    overviews_found += 1
+                    metadata = get_wiki_entity_metadata(get_wiki_id(title))
+                    if metadata:
+                        claims = metadata.get("claims")
+                        if not claims:
+                            print("⚠️ No claims found in metadata")
+                            continue
 
-        # if movie_data:
-        #     print(movie_data)
-        #     movie_data = movie_data["movie_results"][0]["media_type"]
-        # else:
-        #     continue
-        # media_type.add(movie_data)
-    # print(media_type)
-    # overview = movie_data["movie_results"][0]["overview"]
-    # genres = get_movie_genres(movie_data["movie_results"][0]["genre_ids"], movie_data["movie_results"][0]["media_type"])
+                        p31_list = claims.get("P31")
+                        if not p31_list or not isinstance(p31_list, list):
+                            print("⚠️ No P31 found for this entity")
+                            continue
 
+                        mainsnak = p31_list[0].get("mainsnak")
+                        if not mainsnak:
+                            print("⚠️ No mainsnak found in first P31 entry")
+                            continue
+
+                        datavalue = mainsnak.get("datavalue")
+                        if not datavalue:
+                            print("⚠️ No datavalue in mainsnak")
+                            continue
+
+                        value = datavalue.get("value")
+                        if not value:
+                            print("⚠️ No value in datavalue")
+                            continue
+
+                        p31_id = value.get("id")
+                        print("P31 ID:", p31_id)
+
+                        unique_entry_item_ids.add(p31_id)
+                    else:
+                        print("no meta data found")
+                    break
+
+    total = len(unique_series)
+    print("\nMedia Type Breakdown:", type_counts)
+    print(f"Missing Wikidata IDs: {len(failed_titles)} / {total} ({len(failed_titles)/total:.2%})")
+    print(f"Media with Overview: {overviews_found} / {total} ({overviews_found/total:.2%})")
+    print(f"P31 IDs: {unique_entry_item_ids}")
+
+    for id in unique_entry_item_ids:
+        print(f"{id}: {get_wiki_entity_metadata(id).get("labels").get("en").get("value")}")
     # titles, summaries, genres = load_movie_data("processed_netflix.csv")
 
     # interstellar_summary = "Interstellar is a science fiction film directed by Christopher Nolan that follows a group of astronauts who travel through a wormhole in search of a new habitable planet as Earth faces ecological collapse."
