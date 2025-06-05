@@ -10,7 +10,9 @@ from dotenv import load_dotenv
 from nomic import embed
 
 load_dotenv()
-TMDB_API_TOKEN = os.getenv('TMDB_API_READ_ACCESS_TOKEN')
+TMDB_API_TOKEN = os.getenv("TMDB-API-READ-ACCESS-TOKEN") #note: for some reason in .env, if you do TMDB_API_READ_ACCESS_TOKEN it replaces - with _ in the value (dunno why)
+if not TMDB_API_TOKEN:
+    raise RuntimeError("TMDB-API-READ-ACCESS-TOKEN not set in .env")
 MOVIE_GENRES = {
     28: "Action",
     12: "Adventure",
@@ -85,7 +87,7 @@ def wikidata_search(query):
     else:
         return None
     
-def get_movie_data(title):
+def get_media_data(title):
     movie_id = wikidata_search(title)
     if movie_id:
         movie_id = movie_id["title"]
@@ -99,7 +101,7 @@ def get_movie_data(title):
     }
     return requests.get(url, headers=headers).json()
 
-def get_movie_genres(ids, media_type):
+def get_media_genres(ids, media_type):
     genres = []
     for id in ids:
         if media_type == "movie":
@@ -107,7 +109,7 @@ def get_movie_genres(ids, media_type):
         else:
             genres.append(TV_GENRES[id])
 
-def load_movie_data(filepath):
+def load_media_data(filepath):
     """Load and preprocess movie data."""
     df = pd.read_csv(filepath)
     df.dropna(subset=['Title', 'Summary', 'Genre'], inplace=True)
@@ -161,19 +163,19 @@ def visualize_embeddings(titles, genres, embeddings, query_emb, interstellar_emb
     plt.show()
 
 def main():
-    titles, summaries, genres = load_movie_data("processed_netflix.csv")
-    media_type = set()
     authenticate_tmdb()
+    titles, summaries, genres = load_media_data("processed_netflix.csv")
+    media_type = set()
     for movie_title in titles:
         print(movie_title)      
-        print(get_movie_data(movie_title))
+        data = get_media_data(movie_title)
         # if movie_data:
         #     print(movie_data)
         #     movie_data = movie_data["movie_results"][0]["media_type"]
         # else:
         #     continue
         # media_type.add(movie_data)
-    print(media_type)
+    # print(media_type)
     # overview = movie_data["movie_results"][0]["overview"]
     # genres = get_movie_genres(movie_data["movie_results"][0]["genre_ids"], movie_data["movie_results"][0]["media_type"])
 
