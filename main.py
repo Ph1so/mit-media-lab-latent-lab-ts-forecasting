@@ -53,7 +53,7 @@ TV_GENRES = {
     37: "Western"
 }
 
-P31_IDS: {'Q63952888', 'Q17517379', 'Q21191270', 'Q20650540', 'Q526877', 'Q3464665', 'Q11424', 'Q21198342', 'Q12737077', 'Q5398426', 'Q117467246', 'Q431289', 'Q1259759'}
+P31_IDS = {'Q63952888', 'Q17517379', 'Q21191270', 'Q20650540', 'Q526877', 'Q3464665', 'Q11424', 'Q21198342', 'Q5398426', 'Q117467246', 'Q1259759'}
 
 # --- API Wrappers ---
 def authenticate_tmdb():
@@ -65,7 +65,16 @@ def authenticate_tmdb():
     response = requests.get(url, headers=headers)
     print("TMDB Auth Response:", response.text)
 
-def wikidata_search(query):
+
+
+# --- Wikidata Utilities ---
+def wikidata_search(query, validate_p31=False):
+    """
+    validate_p31 = false:
+        This returns the first entry after searching using the query given
+    validate_p31 = true:
+        This returns the first entry that is an INSTANCE OF one of the P31 ids from the P31 ids list. NOTE P31 = 'instance of' in wikidata
+    """
     url = "https://www.wikidata.org/w/api.php"
     params = {
         "action": "query",
@@ -74,29 +83,53 @@ def wikidata_search(query):
         "srsearch": query,
         "srnamespace": 0
     }
+
     response = requests.get(url, params=params)
-    data = response.json()
-    results = data.get("query", {}).get("search")
-    if results:
-        result = results[0]
-        return {
-            "title": result["title"],
-            "snippet": result.get("snippet", ""),
-            "url": f"https://www.wikidata.org/wiki/{result['title'].replace(' ', '_')}"
-        }
+    results = response.json().get("query", {}).get("search", [])
+
+    for result in results:
+        entity_id = result.get("title")
+        if not validate_p31:
+            return {
+                "title": entity_id,
+                "url": f"https://www.wikidata.org/wiki/{entity_id.replace(' ', '_')}",
+                "snippet": result.get("snippet", "")
+            }
+
+        metadata = get_wiki_entity_metadata(entity_id)
+        p31_list = metadata.get("claims", {}).get("P31", [])
+        for claim in p31_list:
+            p31_id = (
+                claim.get("mainsnak", {})
+                .get("datavalue", {})
+                .get("value", {})
+                .get("id")
+            )
+            if p31_id in P31_IDS:
+                return {
+                    "title": entity_id,
+                    "url": f"https://www.wikidata.org/wiki/{entity_id.replace(' ', '_')}",
+                    "snippet": result.get("snippet", "")
+                }
     return None
+
+def get_wiki_id(title, validate_p31=False):
+    """
+        validate_p31 = false:
+            This returns the wikidata id of the first search result using the title given
+        validate_p31 = true:
+            This returns the wikidata id of the first search result that is an INSTANCE OF one of the P31 ids from the P31 ids list. NOTE P31 = 'instance of' in wikidata
+    """
+    result = wikidata_search(title, validate_p31=validate_p31)
+    return result["title"] if result else None
 
 def get_wiki_entity_metadata(entity_id):
     url = f"https://www.wikidata.org/wiki/Special:EntityData/{entity_id}.json"
     response = requests.get(url)
     return response.json()['entities'].get(entity_id)
 
-def get_wiki_id(title):
-    result = wikidata_search(title)
-    return result["title"] if result else None
-
-def get_media_data(title):
-    wiki_id = get_wiki_id(title)
+def get_media_data(title, validate_p31=False):
+    wiki_id = get_wiki_id(title, validate_p31)
     if not wiki_id:
         print(f"⚠️ No Wikidata ID found for: {title}")
         return {}
@@ -142,13 +175,11 @@ def visualize_embeddings(titles, genres, embeddings, query_emb, ref_emb, ref_nam
     plt.tight_layout()
     plt.show()
 
-# --- Main Pipeline ---
-def main():
-    authenticate_tmdb()
-    titles, summaries, genres, dates = load_media_data("processed_netflix.csv")
-
+def normalize_titles(titles):
+    """Clean and deduplicate titles while preserving individual seasons."""
     unique_series = set()
-    for i, title in enumerate(titles):
+    cleaned_titles = []
+    for title in titles:
         parts = title.split(":")
         if len(parts) >= 3 and "Season" in parts[1]:
             clean_title = ":".join(parts[:2]).strip()
@@ -157,68 +188,82 @@ def main():
         else:
             clean_title = parts[0].strip()
         unique_series.add(clean_title)
-        titles[i] = clean_title
+        cleaned_titles.append(clean_title)
+    return list(unique_series), cleaned_titles
 
+
+def get_valid_media_entries(titles, validate_p31=False):
+    """Fetch media data and collect valid entries with an overview."""
     type_counts = {"movie": 0, "tv": 0, "tv_episode": 0, "tv_season": 0}
     failed_titles = []
-    overviews_found = 0
-    unique_entry_item_ids = set()
-    for title in unique_series:
+    valid_titles = []
+    
+    for title in titles:
         print(f"Querying: {title}")
-        data = get_media_data(title)
+        data = get_media_data(title, validate_p31=validate_p31)
         if not data:
             failed_titles.append(title)
             continue
 
         for key in ["movie_results", "tv_results", "tv_episode_results", "tv_season_results"]:
-            if key in data and data[key]:
-                type = key.replace("_results", "")
-                type_counts[type] += 1
+            if data.get(key):
+                type_counts[key.replace("_results", "")] += 1
                 if data[key][0].get("overview"):
-                    overviews_found += 1
-                    metadata = get_wiki_entity_metadata(get_wiki_id(title))
-                    if metadata:
-                        claims = metadata.get("claims")
-                        if not claims:
-                            print("⚠️ No claims found in metadata")
-                            continue
+                    valid_titles.append(title)
+                break
 
-                        p31_list = claims.get("P31")
-                        if not p31_list or not isinstance(p31_list, list):
-                            print("⚠️ No P31 found for this entity")
-                            continue
+    return type_counts, failed_titles, valid_titles
 
-                        mainsnak = p31_list[0].get("mainsnak")
-                        if not mainsnak:
-                            print("⚠️ No mainsnak found in first P31 entry")
-                            continue
 
-                        datavalue = mainsnak.get("datavalue")
-                        if not datavalue:
-                            print("⚠️ No datavalue in mainsnak")
-                            continue
+def extract_p31_ids(valid_titles, validate_p31=False):
+    """Extract P31 IDs from Wikidata for titles with an overview."""
+    p31_ids = set()
+    for title in valid_titles:
+        metadata = get_wiki_entity_metadata(get_wiki_id(title, validate_p31=validate_p31))
+        if not metadata:
+            continue
+        try:
+            p31 = (
+                metadata.get("claims", {})
+                .get("P31", [])[0]
+                .get("mainsnak", {})
+                .get("datavalue", {})
+                .get("value", {})
+                .get("id")
+            )
+            if p31:
+                p31_ids.add(p31)
+        except Exception:
+            continue
+    return p31_ids
 
-                        value = datavalue.get("value")
-                        if not value:
-                            print("⚠️ No value in datavalue")
-                            continue
 
-                        p31_id = value.get("id")
-                        print("P31 ID:", p31_id)
+def describe_p31_ids(p31_ids):
+    """Print human-readable P31 labels."""
+    for p31_id in p31_ids:
+        label = get_wiki_entity_metadata(p31_id).get("labels", {}).get("en", {}).get("value", "Unknown")
+        print(f"{p31_id}: {label}")
 
-                        unique_entry_item_ids.add(p31_id)
-                    else:
-                        print("no meta data found")
-                    break
+def get_P31_IDs(validate_p31=False):
+    titles, summaries, genres, dates = load_media_data("processed_netflix.csv")
+    unique_series, _ = normalize_titles(titles)
+    type_counts, failed_titles, valid_titles = get_valid_media_entries(unique_series, validate_p31)
+    p31_ids = extract_p31_ids(valid_titles, validate_p31)
 
     total = len(unique_series)
     print("\nMedia Type Breakdown:", type_counts)
     print(f"Missing Wikidata IDs: {len(failed_titles)} / {total} ({len(failed_titles)/total:.2%})")
-    print(f"Media with Overview: {overviews_found} / {total} ({overviews_found/total:.2%})")
-    print(f"P31 IDs: {unique_entry_item_ids}")
+    print(f"Media with Overview: {len(valid_titles)} / {total} ({len(valid_titles)/total:.2%})")
+    print(f"P31 IDs: {p31_ids}")
+    describe_p31_ids(p31_ids)
 
-    for id in unique_entry_item_ids:
-        print(f"{id}: {get_wiki_entity_metadata(id).get("labels").get("en").get("value")}")
+    return p31_ids
+
+# --- Main Pipeline ---
+def main():
+    authenticate_tmdb()
+    get_P31_IDs()
+    get_P31_IDs(validate_p31=True)
     # titles, summaries, genres = load_movie_data("processed_netflix.csv")
 
     # interstellar_summary = "Interstellar is a science fiction film directed by Christopher Nolan that follows a group of astronauts who travel through a wormhole in search of a new habitable planet as Earth faces ecological collapse."
