@@ -315,66 +315,125 @@ def create_csv_with_TMDB():
 def embed_texts(texts):
     return np.array(embed.text(texts=texts, model="nomic-embed-text-v1")['embeddings'])
 
-def visualize_embeddings(titles, genres, embeddings, query_emb, ref_emb, ref_name="Reference"):
-    all_embeddings = np.vstack([embeddings, ref_emb, query_emb])
+def visualize_embeddings(titles, genres, embeddings, highlight_groups, ref_emb=None, ref_name="Reference"):
+    """
+    highlight_groups: List of (label, keyword, color, query_emb) tuples.
+    Example:
+        [("Dr. Stone", "DR.STONE", "red", red_emb),
+         ("Arcane", "Arcane", "blue", blue_emb)]
+    """
+
+    all_group_embs = [query_emb for _, _, _, query_emb in highlight_groups]
+    all_embeddings = np.vstack([embeddings] + all_group_embs + ([ref_emb] if ref_emb is not None else []))
     reduced = PCA(n_components=2).fit_transform(all_embeddings)
 
-    corpus_2d, ref_2d, query_2d = reduced[:-2], reduced[-2], reduced[-1]
+    n = len(titles)
+    corpus_2d = reduced[:n]
+    group_embs_2d = reduced[n:n + len(highlight_groups)]
+    ref_2d = reduced[-1] if ref_emb is not None else None
+
+    # Plotting base
     cmap = cm.get_cmap('tab20', len(set(genres)))
     genre_colors = {genre: cmap(i) for i, genre in enumerate(sorted(set(genres)))}
     colors = [genre_colors[g] for g in genres]
 
     plt.figure(figsize=(20, 20))
     plt.scatter(corpus_2d[:, 0], corpus_2d[:, 1], c=colors)
-    for i, title in enumerate(titles):
-        plt.annotate(title, (corpus_2d[i, 0], corpus_2d[i, 1]), fontsize=8)
-    plt.scatter(query_2d[0], query_2d[1], color='red', marker='x', s=100)
-    plt.annotate("Query", query_2d, fontsize=10, color='red')
-    plt.scatter(ref_2d[0], ref_2d[1], color='green', marker='x', s=100)
-    plt.annotate(ref_name, ref_2d, fontsize=10, color='green')
-    
-    legend = [plt.Line2D([0], [0], marker='o', color='w', label=genre, markerfacecolor=color, markersize=8)
+    # for i, title in enumerate(titles):
+        # plt.annotate(title, (corpus_2d[i, 0], corpus_2d[i, 1]), fontsize=8)
+
+
+    # Reference point
+    if ref_emb is not None:
+        plt.scatter(ref_2d[0], ref_2d[1], color='black', marker='x', s=100)
+        plt.annotate(ref_name, ref_2d, fontsize=10, color='black')
+
+    # Legend
+    legend = [plt.Line2D([0], [0], marker='o', color='w', label=genre,
+                         markerfacecolor=color, markersize=8)
               for genre, color in genre_colors.items()]
     plt.legend(handles=legend, bbox_to_anchor=(1.05, 1), loc='upper left', title="Genres")
     plt.title("2D Visualization of Media Embeddings")
     plt.grid(True)
     plt.tight_layout()
+    plt.xlim(-0.1, 0.25)
+    plt.ylim(-0.125, 0.175)
 
-    plt.xlim(0,0.2)
-    plt.ylim(-0.1,0.15)
-    # --- Draw boundary around "DR.STONE" titles ---
-    dr_stone_indices = [i for i, title in enumerate(titles) if "DR.STONE" in title.upper()]
-    if dr_stone_indices:
-        dr_stone_points = corpus_2d[dr_stone_indices]
-        if len(dr_stone_points) >= 3:
-            hull = ConvexHull(dr_stone_points)
-            for simplex in hull.simplices:
-                plt.plot(dr_stone_points[simplex, 0], dr_stone_points[simplex, 1], 'k--', linewidth=2)
-        else:
-            plt.scatter(dr_stone_points[:, 0], dr_stone_points[:, 1], edgecolors='black', facecolors='none', s=100, linewidths=2)
+    # --- Plot group boundaries and queries ---
+    for i, (label, keyword, color, query_emb) in enumerate(highlight_groups):
+        indices = [j for j, title in enumerate(titles) if keyword.upper() in title.upper()]
+        if indices:
+            group_points = corpus_2d[indices]
+            if len(group_points) >= 3:
+                hull = ConvexHull(group_points)
+                for simplex in hull.simplices:
+                    plt.plot(group_points[simplex, 0], group_points[simplex, 1],
+                             linestyle='--', color=color, linewidth=2)
+            else:
+                plt.scatter(group_points[:, 0], group_points[:, 1],
+                            edgecolors=color, facecolors='none', s=100, linewidths=2)
+            center = group_points.mean(axis=0)
+            plt.annotate(label, center, fontsize=12, color=color)
+
+        # Plot the group-specific query
+        query_2d = group_embs_2d[i]
+        plt.scatter(query_2d[0], query_2d[1], color=color, marker='x', s=100)
+        plt.annotate(f"{keyword} Query", query_2d, fontsize=10, color=color)
 
     plt.show()
 
 # --- Main Pipeline ---
 def main():
     authenticate_tmdb()
-    # get_P31_IDs(validate_p31=False, max_entries=2000)
-    # get_P31_IDs(validate_p31=True, max_entries=2000)
+
     titles, summaries, genres, date= load_media_data("cleaned_netflix_data.csv")
-    haiykuu = "Inspired by a small-statured pro volleyball player, Shouyou Hinata creates a volleyball team in his last year of middle school. Unfortunately the team is matched up against the ""King of the Court"" Tobio Kageyama's team in their first tournament and inevitably lose. After the crushing defeat, Hinata vows to surpass Kageyama. After entering high school, Hinata joins the volleyball team only to find that Tobio has also joined."
-    query_summary = "a science-fiction anime centered around Senku Ishigami, a genius high school student who wakes up thousands of years after a mysterious phenomenon turns all of humanity into stone."
-    corpus_embeddings = embed_texts(summaries)
-    haiykuu_emb = embed_texts([haiykuu])[0]
-    query_emb = embed_texts([query_summary])[0]
-
-    # Flatten to first genre for coloring
-
+    print(len(set(summaries))/len(summaries))
     cleaned_genres = [ast.literal_eval(g) if isinstance(g, str) else ["Unknown"] for g in genres]
-
     simplified_genres = [g[0] if isinstance(g, list) and g else "Unknown" for g in cleaned_genres]
 
-    visualize_embeddings(titles, simplified_genres, corpus_embeddings, query_emb, haiykuu_emb)
+    red = "a science-fiction anime centered around Senku Ishigami, a genius high school student " \
+    "who wakes up thousands of years after a mysterious phenomenon turns all of humanity into stone."
 
+    blue = "an animated sci-fi fantasy series set in the universe of the video game League of Legends. " \
+    "It explores the origins of iconic champions and the conflict between two cities: " \
+    "the wealthy, tech-advanced Piltover and the oppressed, chaotic Zaun."
+
+    green = "Hundreds of cash-strapped players accept a strange invitation to compete in children's games " \
+    "for a tempting prize — but the stakes are deadly."
+
+    orange = "a teen sitcom that aired on Nickelodeon from 2010 to 2013. It follows Tori Vega, a talented " \
+    "teenager who unexpectedly finds herself attending Hollywood Arts High School, " \
+    "a performing arts school filled with eccentric and creative students."
+
+    red_em = embed_texts([red])[0]
+    blue_em = embed_texts([blue])[0]
+    green_em = embed_texts([green])[0]
+    orange_em = embed_texts([orange])[0]
+
+    highlight_groups = [
+        ("Dr. Stone Group", "DR.STONE", "red", red_em),
+        ("Arcane Group", "Arcane", "blue", blue_em),
+        ("Squid Game Group", "Squid Game", "green", green_em),
+        ("Victorious Group", "Victorious", "orange", orange_em)
+    ]
+
+    # combined_texts = []
+    # for summary, genre_list in zip(summaries, cleaned_genres):
+    #     genre_str = ", ".join(genre_list)
+    #     combined_text = f"Genres: {genre_str}. Summary: {summary}"
+    #     combined_texts.append(combined_text)
+
+    # corpus_embeddings = embed_texts(combined_texts)
+
+    corpus_embeddings = embed_texts(summaries)
+
+    visualize_embeddings(
+        titles,
+        simplified_genres,
+        corpus_embeddings,
+        highlight_groups=highlight_groups,
+        ref_emb=None
+)
 
 if __name__ == "__main__":
     main()
