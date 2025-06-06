@@ -1,3 +1,5 @@
 venv
 .env
 processed_netflix.csv
+NetflixViewingHistory (1).csv
+NetflixViewingHistory (2).csv

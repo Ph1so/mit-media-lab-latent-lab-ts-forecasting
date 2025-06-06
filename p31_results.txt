@@ -1,0 +1,142 @@
+
+Media Type Breakdown: {'movie': 825, 'tv': 101, 'tv_episode': 13, 'tv_season': 85}
+Missing Wikidata IDs: 190 / 2000 (9.50%)
+Media with Overview: 1002 / 2000 (50.10%)
+P31 IDs: {'Q117467246', 'Q24862', 'Q3464665', 'Q100269041', 'Q21198342', 'Q5398426', 'Q98807719', 'Q202866', 'Q1261214', 'Q526877', 'Q1259759', 'Q17517379', 'Q196600', 'Q21191270', 'Q24856', 'Q11424', 'Q102364578', 'Q20650540', 'Q1667921', 'Q106594041', 'Q63952888', 'Q506240', 'Q12737077', 'Q15416'}
+Q117467246: animated television series
+Q24862: short film
+Q3464665: television series season
+Q100269041: anime television series season
+Q21198342: manga series
+Q5398426: television series
+Q98807719: animated television film
+Q202866: animated film
+Q1261214: television special
+Q526877: web series
+Q1259759: miniseries
+Q17517379: animated short film
+Q196600: media franchise
+Q21191270: television series episode
+Q24856: film series
+Q11424: film
+Q102364578: anime television series episode
+Q20650540: anime film
+Q1667921: novel series
+Q106594041: annual music competition
+Q63952888: anime television series
+Q506240: television film
+Q12737077: occupation
+Q15416: television program
+
+Media Type Breakdown: {'movie': 1087, 'tv': 136, 'tv_episode': 18, 'tv_season': 86}
+Missing Wikidata IDs: 290 / 2000 (14.50%)
+Media with Overview: 1304 / 2000 (65.20%)
+P31 IDs: {'Q1667921', 'Q17517379', 'Q117467246', 'Q202866', 'Q24862', 'Q3464665', 'Q21191270', 'Q63952888', 'Q11424', 'Q5398426', 'Q506240', 'Q102364578', 'Q526877', 'Q1261214', 'Q21198342', 'Q20650540', 'Q1259759'}
+Q1667921: novel series
+Q17517379: animated short film
+Q117467246: animated television series
+Q202866: animated film
+Q24862: short film
+Q3464665: television series season
+Q21191270: television series episode
+Q63952888: anime television series
+Q11424: film
+Q5398426: television series
+Q506240: television film
+Q102364578: anime television series episode
+Q526877: web series
+Q1261214: television special
+Q21198342: manga series
+Q20650540: anime film
+Q1259759: miniseries
+
+Media Type Breakdown: {'movie': 11, 'tv': 14, 'tv_episode': 1, 'tv_season': 13}
+Missing Wikidata IDs: 8 / 2000 (0.40%)
+Media with Overview: 38 / 2000 (1.90%)
+P31 IDs: {'Q1259759', 'Q17517379', 'Q526877', 'Q63952888', 'Q117467246', 'Q5398426', 'Q12737077', 'Q11424', 'Q3464665', 'Q431289', 'Q21198342', 'Q20650540', 'Q21191270'}
+Q1259759: miniseries
+Q17517379: animated short film
+Q526877: web series
+Q63952888: anime television series
+Q117467246: animated television series
+Q5398426: television series
+Q12737077: occupation
+Q11424: film
+Q3464665: television series season
+Q431289: brand
+Q21198342: manga series
+Q20650540: anime film
+Q21191270: television series episode
+
+Media Type Breakdown: {'movie': 11, 'tv': 14, 'tv_episode': 1, 'tv_season': 13}
+Missing Wikidata IDs: 8 / 93 (8.60%)
+Media with Overview: 38 / 93 (40.86%)
+P31 IDs: {'Q12737077', 'Q21198342', 'Q431289', 'Q63952888', 'Q5398426', 'Q20650540', 'Q117467246', 'Q3464665', 'Q11424', 'Q526877', 'Q21191270', 'Q17517379', 'Q1259759'}
+Q12737077: occupation
+Q21198342: manga series
+Q431289: brand
+Q63952888: anime television series
+Q5398426: television series
+Q20650540: anime film
+Q117467246: animated television series
+Q3464665: television series season
+Q11424: film
+Q526877: web series
+Q21191270: television series episode
+Q17517379: animated short film
+Q1259759: miniseries
+
+Media Type Breakdown: {'movie': 12, 'tv': 17, 'tv_episode': 1, 'tv_season': 14}
+Missing Wikidata IDs: 13 / 93 (13.98%)
+Media with Overview: 43 / 93 (46.24%)
+P31 IDs: {'Q12737077', 'Q21198342', 'Q431289', 'Q63952888', 'Q506240', 'Q5398426', 'Q20650540', 'Q117467246', 'Q3464665', 'Q100269041', 'Q11424', 'Q526877', 'Q21191270', 'Q17517379', 'Q1259759'}
+Q12737077: occupation
+Q21198342: manga series
+Q431289: brand
+Q63952888: anime television series
+Q506240: television film
+Q5398426: television series
+Q20650540: anime film
+Q117467246: animated television series
+Q3464665: television series season
+Q100269041: anime television series season
+Q11424: film
+Q526877: web series
+Q21191270: television series episode
+Q17517379: animated short film
+Q1259759: miniseries
+
+Media Type Breakdown: {'movie': 58, 'tv': 19, 'tv_episode': 2, 'tv_season': 13}
+Missing Wikidata IDs: 4 / 150 (2.67%)
+Media with Overview: 91 / 150 (60.67%)
+P31 IDs: {'Q5398426', 'Q1259759', 'Q117467246', 'Q431289', 'Q63952888', 'Q11424', 'Q102364578', 'Q202866', 'Q3464665', 'Q7889', 'Q20650540', 'Q21198342'}
+Q5398426: television series
+Q1259759: miniseries
+Q117467246: animated television series
+Q431289: brand
+Q63952888: anime television series
+Q11424: film
+Q102364578: anime television series episode
+Q202866: animated film
+Q3464665: television series season
+Q7889: video game
+Q20650540: anime film
+Q21198342: manga series
+
+Media Type Breakdown: {'movie': 67, 'tv': 24, 'tv_episode': 2, 'tv_season': 13}
+Missing Wikidata IDs: 9 / 150 (6.00%)
+Media with Overview: 105 / 150 (70.00%)
+P31 IDs: {'Q5398426', 'Q1259759', 'Q117467246', 'Q431289', 'Q63952888', 'Q11424', 'Q102364578', 'Q202866', 'Q506240', 'Q3464665', 'Q7889', 'Q20650540', 'Q21198342'}
+Q5398426: television series
+Q1259759: miniseries
+Q117467246: animated television series
+Q431289: brand
+Q63952888: anime television series
+Q11424: film
+Q102364578: anime television series episode
+Q202866: animated film
+Q506240: television film
+Q3464665: television series season
+Q7889: video game
+Q20650540: anime film
+Q21198342: manga series

@@ -13,6 +13,7 @@ load_dotenv()
 TMDB_API_TOKEN = os.getenv("TMDB-API-READ-ACCESS-TOKEN") #note: for some reason in .env, if you do TMDB_API_READ_ACCESS_TOKEN it replaces - with _ in the value (dunno why)
 if not TMDB_API_TOKEN:
     raise RuntimeError("TMDB-API-READ-ACCESS-TOKEN not set in .env")
+
 MOVIE_GENRES = {
     28: "Action",
     12: "Adventure",
@@ -53,7 +54,8 @@ TV_GENRES = {
     37: "Western"
 }
 
-P31_IDS = {'Q63952888', 'Q17517379', 'Q21191270', 'Q20650540', 'Q526877', 'Q3464665', 'Q11424', 'Q21198342', 'Q5398426', 'Q117467246', 'Q1259759'}
+# valid p31 ids that give TMDB overviews
+P31_IDS = {'Q63952888', 'Q5398426', 'Q106594041', 'Q506240', 'Q98807719', 'Q12737077', 'Q21198342', 'Q1259759', 'Q526877', 'Q11424', 'Q431289', 'Q7889', 'Q20650540', 'Q117467246', 'Q15416', 'Q102364578', 'Q24856', 'Q100269041', 'Q1261214', 'Q1667921', 'Q3464665', 'Q17517379', 'Q21191270', 'Q196600', 'Q24862', 'Q202866'}
 
 # --- API Wrappers ---
 def authenticate_tmdb():
@@ -64,8 +66,6 @@ def authenticate_tmdb():
     }
     response = requests.get(url, headers=headers)
     print("TMDB Auth Response:", response.text)
-
-
 
 # --- Wikidata Utilities ---
 def wikidata_search(query, validate_p31=False):
@@ -143,8 +143,13 @@ def get_media_data(title, validate_p31=False):
 # --- Data Handling ---
 def load_media_data(filepath):
     df = pd.read_csv(filepath)
-    df.dropna(subset=['Title', 'Summary', 'Genre'], inplace=True)
+    df.dropna(subset=['Title', 'Date', 'Summary', 'Genre'], inplace=True)
     return df['Title'].tolist(), df['Summary'].tolist(), df['Genre'].tolist(), df['Date'].tolist()
+
+def load_netflix_data(filepath):
+    df = pd.read_csv(filepath)
+    df.dropna(subset=['Title', 'Date'], inplace=True)
+    return df['Title'].tolist()
 
 def embed_texts(texts):
     return np.array(embed.text(texts=texts, model="nomic-embed-text-v1")['embeddings'])
@@ -192,14 +197,15 @@ def normalize_titles(titles):
     return list(unique_series), cleaned_titles
 
 
-def get_valid_media_entries(titles, validate_p31=False):
+def get_valid_media_entries(titles, validate_p31=False, max_entries = 2000):
     """Fetch media data and collect valid entries with an overview."""
     type_counts = {"movie": 0, "tv": 0, "tv_episode": 0, "tv_season": 0}
     failed_titles = []
     valid_titles = []
-    
-    for title in titles:
-        print(f"Querying: {title}")
+    for i, title in enumerate(titles):
+        if i >= max_entries:
+            break
+        print(f"#{i} Querying: {title}")
         data = get_media_data(title, validate_p31=validate_p31)
         if not data:
             failed_titles.append(title)
@@ -215,10 +221,12 @@ def get_valid_media_entries(titles, validate_p31=False):
     return type_counts, failed_titles, valid_titles
 
 
-def extract_p31_ids(valid_titles, validate_p31=False):
+def extract_p31_ids(valid_titles, validate_p31=False, max_entries = 2000):
     """Extract P31 IDs from Wikidata for titles with an overview."""
     p31_ids = set()
-    for title in valid_titles:
+    for i, title in enumerate(valid_titles):
+        if i >= max_entries:
+            break
         metadata = get_wiki_entity_metadata(get_wiki_id(title, validate_p31=validate_p31))
         if not metadata:
             continue
@@ -237,33 +245,39 @@ def extract_p31_ids(valid_titles, validate_p31=False):
             continue
     return p31_ids
 
-
-def describe_p31_ids(p31_ids):
-    """Print human-readable P31 labels."""
+def describe_p31_ids(p31_ids, logfile="p31_results.txt"):
+    """Log human-readable P31 labels."""
     for p31_id in p31_ids:
         label = get_wiki_entity_metadata(p31_id).get("labels", {}).get("en", {}).get("value", "Unknown")
-        print(f"{p31_id}: {label}")
+        log(f"{p31_id}: {label}", logfile)
 
-def get_P31_IDs(validate_p31=False):
-    titles, summaries, genres, dates = load_media_data("processed_netflix.csv")
+def log(message, logfile="p31_results.txt"):
+    print(message)
+    with open(logfile, "a", encoding="utf-8") as f:
+        f.write(str(message) + "\n")
+
+def get_P31_IDs(validate_p31=False, logfile="p31_results.txt", max_entries = 2000):
+    titles = load_netflix_data("NetflixViewingHistory (1).csv")
+    # titles, summaries, genres, dates = load_media_data("processed_netflix.csv")
     unique_series, _ = normalize_titles(titles)
-    type_counts, failed_titles, valid_titles = get_valid_media_entries(unique_series, validate_p31)
-    p31_ids = extract_p31_ids(valid_titles, validate_p31)
+    type_counts, failed_titles, valid_titles = get_valid_media_entries(unique_series, validate_p31, max_entries)
+    p31_ids = extract_p31_ids(valid_titles, validate_p31, max_entries)
 
-    total = len(unique_series)
-    print("\nMedia Type Breakdown:", type_counts)
-    print(f"Missing Wikidata IDs: {len(failed_titles)} / {total} ({len(failed_titles)/total:.2%})")
-    print(f"Media with Overview: {len(valid_titles)} / {total} ({len(valid_titles)/total:.2%})")
-    print(f"P31 IDs: {p31_ids}")
-    describe_p31_ids(p31_ids)
+    max_entries = min(max_entries, len(unique_series))
+    log("\nMedia Type Breakdown: " + str(type_counts), logfile)
+    log(f"Missing Wikidata IDs: {len(failed_titles)} / {max_entries} ({len(failed_titles)/max_entries:.2%})", logfile)
+    log(f"Media with Overview: {len(valid_titles)} / {max_entries} ({len(valid_titles)/max_entries:.2%})", logfile)
+    log(f"P31 IDs: {p31_ids}", logfile)
+
+    describe_p31_ids(p31_ids, logfile)
 
     return p31_ids
 
 # --- Main Pipeline ---
 def main():
     authenticate_tmdb()
-    get_P31_IDs()
-    get_P31_IDs(validate_p31=True)
+    get_P31_IDs(validate_p31=False, max_entries=2000)
+    get_P31_IDs(validate_p31=True, max_entries=2000)
     # titles, summaries, genres = load_movie_data("processed_netflix.csv")
 
     # interstellar_summary = "Interstellar is a science fiction film directed by Christopher Nolan that follows a group of astronauts who travel through a wormhole in search of a new habitable planet as Earth faces ecological collapse."
