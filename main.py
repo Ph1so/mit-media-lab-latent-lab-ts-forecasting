@@ -246,15 +246,15 @@ def get_P31_IDs(validate_p31=False, logfile="p31_results.txt", max_entries = 200
 
 def create_csv_with_TMDB():
     titles, dates = load_netflix_data("NetflixViewingHistory (1).csv")
-    # _, cleaned_titles = normalize_titles(titles)
     cleaned_titles = titles
-    
+
     if len(cleaned_titles) != len(dates):
         raise ValueError("Mismatch between number of cleaned titles and dates.")
 
     overview_cache = {}
     title_resolution_map = {}
     overviews = []
+    genres = []
 
     for original_title in cleaned_titles:
         if original_title in title_resolution_map:
@@ -263,37 +263,51 @@ def create_csv_with_TMDB():
             continue
 
         current_title = original_title
-        data = get_media_data(current_title, validate_p31=True)
         overview = "No overview available"
+        found_overview = False
 
-        # Try reducing the title if no result is found
-        while data == {} and len(current_title.split(":")) != 1:
-            current_title = ":".join(current_title.split(":")[:-1]).strip()
+        while len(current_title.split(":")) >= 1:
             print(f"Trying {current_title}")
             data = get_media_data(current_title, validate_p31=True)
 
+            if data:
+                for key in ["movie_results", "tv_results", "tv_episode_results", "tv_season_results"]:
+                    if data.get(key):
+                        result = data[key][0]
+                        if result.get("overview"):
+                            overview = result["overview"]
+                            found_overview = True
+                            genre_ids = result.get("genre_ids")
+                            genre_converted = []
+                            if genre_ids:
+                                for id in genre_ids:
+                                    if key[0:2] == "tv":
+                                        genre_converted.append(TV_GENRES[id])
+                                    else:
+                                        genre_converted.append(MOVIE_GENRES[id])
+                                print(f"Genres: {genre_converted}")
+                            if genre_converted == []:
+                                genre_converted.append("NA")
+                            genres.append(genre_converted)
+                            break
+
+            if found_overview or len(current_title.split(":")) == 1:
+                break  # Exit if overview found or nothing left to strip
+            current_title = ":".join(current_title.split(":")[:-1]).strip()
+
         print(f"✅ Using title: {current_title}")
-
-        if data:
-            for key in ["movie_results", "tv_results", "tv_episode_results", "tv_season_results"]:
-                if data.get(key):
-                    result = data[key][0]
-                    if result.get("overview"):
-                        overview = result["overview"]
-                    break
-
-        # Cache resolved title and map original title to it
         overview_cache[current_title] = overview
         title_resolution_map[original_title] = current_title
         overviews.append(overview)
 
     with open("cleaned_netflix_data.csv", mode="w", newline='', encoding="utf-8") as f:
         writer = csv.writer(f)
-        writer.writerow(["Title", "Overview", "Date"])
-        for title, overview, date in zip(cleaned_titles, overviews, dates):
-            writer.writerow([title, overview, date])
+        writer.writerow(["Title", "Overview", "Genres", "Date"])
+        for title, overview, genre, date in zip(cleaned_titles, overviews, genres, dates):
+            writer.writerow([title, overview, genre, date])
 
     print("✅ CSV file 'cleaned_netflix_data.csv' created.")
+
 
 # --- Embedding Pipeline ---
 def embed_texts(texts):
@@ -328,26 +342,21 @@ def visualize_embeddings(titles, genres, embeddings, query_emb, ref_emb, ref_nam
 # --- Main Pipeline ---
 def main():
     authenticate_tmdb()
-    create_csv_with_TMDB()
-
     # get_P31_IDs(validate_p31=False, max_entries=2000)
     # get_P31_IDs(validate_p31=True, max_entries=2000)
-
-    # titles, summaries, genres = load_movie_data("processed_netflix.csv")
-
+    titles, summaries, genre, date= load_media_data("cleaned_netflix_data.csv")
     # interstellar_summary = "Interstellar is a science fiction film directed by Christopher Nolan that follows a group of astronauts who travel through a wormhole in search of a new habitable planet as Earth faces ecological collapse."
     # query_summary = "A science fiction film exploring time dilation, love, and survival with emotional depth and theoretical physics."
 
     # # Remove Interstellar from corpus
     # titles = titles[1:]
     # summaries = summaries[1:]
-    # genres = genres[1:]
 
     # corpus_embeddings = embed_texts(summaries)
     # interstellar_emb = embed_texts([interstellar_summary])[0]
     # query_emb = embed_texts([query_summary])[0]
 
-    # visualize_embeddings(titles, genres, corpus_embeddings, query_emb, interstellar_emb)
+    # visualize_embeddings(titles, corpus_embeddings, query_emb, interstellar_emb)
 
 if __name__ == "__main__":
     main()
