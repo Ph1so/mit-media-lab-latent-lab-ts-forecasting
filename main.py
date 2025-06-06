@@ -10,6 +10,7 @@ from dotenv import load_dotenv
 from nomic import embed
 import csv
 import ast
+from scipy.spatial import ConvexHull
 
 load_dotenv()
 TMDB_API_TOKEN = os.getenv("TMDB-API-READ-ACCESS-TOKEN") #note: for some reason in .env, if you do TMDB_API_READ_ACCESS_TOKEN it replaces - with _ in the value (dunno why)
@@ -338,6 +339,20 @@ def visualize_embeddings(titles, genres, embeddings, query_emb, ref_emb, ref_nam
     plt.title("2D Visualization of Media Embeddings")
     plt.grid(True)
     plt.tight_layout()
+
+    plt.xlim(0,0.2)
+    plt.ylim(-0.1,0.15)
+    # --- Draw boundary around "DR.STONE" titles ---
+    dr_stone_indices = [i for i, title in enumerate(titles) if "DR.STONE" in title.upper()]
+    if dr_stone_indices:
+        dr_stone_points = corpus_2d[dr_stone_indices]
+        if len(dr_stone_points) >= 3:
+            hull = ConvexHull(dr_stone_points)
+            for simplex in hull.simplices:
+                plt.plot(dr_stone_points[simplex, 0], dr_stone_points[simplex, 1], 'k--', linewidth=2)
+        else:
+            plt.scatter(dr_stone_points[:, 0], dr_stone_points[:, 1], edgecolors='black', facecolors='none', s=100, linewidths=2)
+
     plt.show()
 
 # --- Main Pipeline ---
@@ -347,8 +362,7 @@ def main():
     # get_P31_IDs(validate_p31=True, max_entries=2000)
     titles, summaries, genres, date= load_media_data("cleaned_netflix_data.csv")
     haiykuu = "Inspired by a small-statured pro volleyball player, Shouyou Hinata creates a volleyball team in his last year of middle school. Unfortunately the team is matched up against the ""King of the Court"" Tobio Kageyama's team in their first tournament and inevitably lose. After the crushing defeat, Hinata vows to surpass Kageyama. After entering high school, Hinata joins the volleyball team only to find that Tobio has also joined."
-    query_summary = "The story follows Shoyo Hinata, a short but passionate boy who dreams of becoming a great volleyball player despite his height disadvantage. Inspired by a pro nicknamed 'The Little Giant,' he revives a volleyball club at his middle school, only to suffer a crushing defeat by the tall and talented Tobio Kageyama, a genius setter. When Hinata enters Karasuno High School, he unexpectedly ends up on the same team as Kageyama. What starts as a tense rivalry turns into a powerful partnership, as their contrasting skills complement each other on the court. Together with their teammates, they aim to take Karasuno back to national prominence."
-
+    query_summary = "a science-fiction anime centered around Senku Ishigami, a genius high school student who wakes up thousands of years after a mysterious phenomenon turns all of humanity into stone."
     corpus_embeddings = embed_texts(summaries)
     haiykuu_emb = embed_texts([haiykuu])[0]
     query_emb = embed_texts([query_summary])[0]
