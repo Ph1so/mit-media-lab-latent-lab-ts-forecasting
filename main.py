@@ -8,6 +8,7 @@ from sklearn.decomposition import PCA
 from sklearn.metrics.pairwise import cosine_similarity
 from dotenv import load_dotenv
 from nomic import embed
+import csv
 
 load_dotenv()
 TMDB_API_TOKEN = os.getenv("TMDB-API-READ-ACCESS-TOKEN") #note: for some reason in .env, if you do TMDB_API_READ_ACCESS_TOKEN it replaces - with _ in the value (dunno why)
@@ -55,7 +56,7 @@ TV_GENRES = {
 }
 
 # valid p31 ids that give TMDB overviews
-P31_IDS = {'Q63952888', 'Q5398426', 'Q106594041', 'Q506240', 'Q98807719', 'Q12737077', 'Q21198342', 'Q1259759', 'Q526877', 'Q11424', 'Q431289', 'Q7889', 'Q20650540', 'Q117467246', 'Q15416', 'Q102364578', 'Q24856', 'Q100269041', 'Q1261214', 'Q1667921', 'Q3464665', 'Q17517379', 'Q21191270', 'Q196600', 'Q24862', 'Q202866'}
+P31_IDS = {'Q63952888', 'Q5398426', 'Q106594041', 'Q506240', 'Q98807719', 'Q12737077', 'Q1259759', 'Q526877', 'Q11424', 'Q431289', 'Q7889', 'Q20650540', 'Q117467246', 'Q15416', 'Q102364578', 'Q24856', 'Q100269041', 'Q1261214', 'Q1667921', 'Q3464665', 'Q17517379', 'Q21191270', 'Q196600', 'Q24862', 'Q202866'}
 
 # --- API Wrappers ---
 def authenticate_tmdb():
@@ -149,36 +150,7 @@ def load_media_data(filepath):
 def load_netflix_data(filepath):
     df = pd.read_csv(filepath)
     df.dropna(subset=['Title', 'Date'], inplace=True)
-    return df['Title'].tolist()
-
-def embed_texts(texts):
-    return np.array(embed.text(texts=texts, model="nomic-embed-text-v1")['embeddings'])
-
-def visualize_embeddings(titles, genres, embeddings, query_emb, ref_emb, ref_name="Reference"):
-    all_embeddings = np.vstack([embeddings, ref_emb, query_emb])
-    reduced = PCA(n_components=2).fit_transform(all_embeddings)
-
-    corpus_2d, ref_2d, query_2d = reduced[:-2], reduced[-2], reduced[-1]
-    cmap = cm.get_cmap('tab20', len(set(genres)))
-    genre_colors = {genre: cmap(i) for i, genre in enumerate(sorted(set(genres)))}
-    colors = [genre_colors[g] for g in genres]
-
-    plt.figure(figsize=(20, 20))
-    plt.scatter(corpus_2d[:, 0], corpus_2d[:, 1], c=colors)
-    for i, title in enumerate(titles):
-        plt.annotate(title, (corpus_2d[i, 0], corpus_2d[i, 1]), fontsize=8)
-    plt.scatter(query_2d[0], query_2d[1], color='red', marker='x', s=100)
-    plt.annotate("Query", query_2d, fontsize=10, color='red')
-    plt.scatter(ref_2d[0], ref_2d[1], color='green', marker='x', s=100)
-    plt.annotate(ref_name, ref_2d, fontsize=10, color='green')
-    
-    legend = [plt.Line2D([0], [0], marker='o', color='w', label=genre, markerfacecolor=color, markersize=8)
-              for genre, color in genre_colors.items()]
-    plt.legend(handles=legend, bbox_to_anchor=(1.05, 1), loc='upper left', title="Genres")
-    plt.title("2D Visualization of Media Embeddings")
-    plt.grid(True)
-    plt.tight_layout()
-    plt.show()
+    return df['Title'].tolist(), df['Date'].tolist()
 
 def normalize_titles(titles):
     """Clean and deduplicate titles while preserving individual seasons."""
@@ -191,11 +163,10 @@ def normalize_titles(titles):
         elif len(parts) == 2 and "Episode" in parts[1]:
             clean_title = parts[0].strip()
         else:
-            clean_title = parts[0].strip()
+            clean_title = title.strip()
         unique_series.add(clean_title)
         cleaned_titles.append(clean_title)
     return list(unique_series), cleaned_titles
-
 
 def get_valid_media_entries(titles, validate_p31=False, max_entries = 2000):
     """Fetch media data and collect valid entries with an overview."""
@@ -257,7 +228,7 @@ def log(message, logfile="p31_results.txt"):
         f.write(str(message) + "\n")
 
 def get_P31_IDs(validate_p31=False, logfile="p31_results.txt", max_entries = 2000):
-    titles = load_netflix_data("NetflixViewingHistory (1).csv")
+    titles, _ = load_netflix_data("NetflixViewingHistory (1).csv")
     # titles, summaries, genres, dates = load_media_data("processed_netflix.csv")
     unique_series, _ = normalize_titles(titles)
     type_counts, failed_titles, valid_titles = get_valid_media_entries(unique_series, validate_p31, max_entries)
@@ -273,11 +244,95 @@ def get_P31_IDs(validate_p31=False, logfile="p31_results.txt", max_entries = 200
 
     return p31_ids
 
+def create_csv_with_TMDB():
+    titles, dates = load_netflix_data("NetflixViewingHistory (1).csv")
+    # _, cleaned_titles = normalize_titles(titles)
+    cleaned_titles = titles
+    
+    if len(cleaned_titles) != len(dates):
+        raise ValueError("Mismatch between number of cleaned titles and dates.")
+
+    overview_cache = {}
+    title_resolution_map = {}
+    overviews = []
+
+    for original_title in cleaned_titles:
+        if original_title in title_resolution_map:
+            resolved_title = title_resolution_map[original_title]
+            overviews.append(overview_cache[resolved_title])
+            continue
+
+        current_title = original_title
+        data = get_media_data(current_title, validate_p31=True)
+        overview = "No overview available"
+
+        # Try reducing the title if no result is found
+        while data == {} and len(current_title.split(":")) != 1:
+            current_title = ":".join(current_title.split(":")[:-1]).strip()
+            print(f"Trying {current_title}")
+            data = get_media_data(current_title, validate_p31=True)
+
+        print(f"✅ Using title: {current_title}")
+
+        if data:
+            for key in ["movie_results", "tv_results", "tv_episode_results", "tv_season_results"]:
+                if data.get(key):
+                    result = data[key][0]
+                    if result.get("overview"):
+                        overview = result["overview"]
+                    break
+
+        # Cache resolved title and map original title to it
+        overview_cache[current_title] = overview
+        title_resolution_map[original_title] = current_title
+        overviews.append(overview)
+
+    with open("cleaned_netflix_data.csv", mode="w", newline='', encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow(["Title", "Overview", "Date"])
+        for title, overview, date in zip(cleaned_titles, overviews, dates):
+            writer.writerow([title, overview, date])
+
+    print("✅ CSV file 'cleaned_netflix_data.csv' created.")
+
+# --- Embedding Pipeline ---
+def embed_texts(texts):
+    return np.array(embed.text(texts=texts, model="nomic-embed-text-v1")['embeddings'])
+
+def visualize_embeddings(titles, genres, embeddings, query_emb, ref_emb, ref_name="Reference"):
+    all_embeddings = np.vstack([embeddings, ref_emb, query_emb])
+    reduced = PCA(n_components=2).fit_transform(all_embeddings)
+
+    corpus_2d, ref_2d, query_2d = reduced[:-2], reduced[-2], reduced[-1]
+    cmap = cm.get_cmap('tab20', len(set(genres)))
+    genre_colors = {genre: cmap(i) for i, genre in enumerate(sorted(set(genres)))}
+    colors = [genre_colors[g] for g in genres]
+
+    plt.figure(figsize=(20, 20))
+    plt.scatter(corpus_2d[:, 0], corpus_2d[:, 1], c=colors)
+    for i, title in enumerate(titles):
+        plt.annotate(title, (corpus_2d[i, 0], corpus_2d[i, 1]), fontsize=8)
+    plt.scatter(query_2d[0], query_2d[1], color='red', marker='x', s=100)
+    plt.annotate("Query", query_2d, fontsize=10, color='red')
+    plt.scatter(ref_2d[0], ref_2d[1], color='green', marker='x', s=100)
+    plt.annotate(ref_name, ref_2d, fontsize=10, color='green')
+    
+    legend = [plt.Line2D([0], [0], marker='o', color='w', label=genre, markerfacecolor=color, markersize=8)
+              for genre, color in genre_colors.items()]
+    plt.legend(handles=legend, bbox_to_anchor=(1.05, 1), loc='upper left', title="Genres")
+    plt.title("2D Visualization of Media Embeddings")
+    plt.grid(True)
+    plt.tight_layout()
+    plt.show()
+
 # --- Main Pipeline ---
 def main():
     authenticate_tmdb()
-    get_P31_IDs(validate_p31=False, max_entries=2000)
-    get_P31_IDs(validate_p31=True, max_entries=2000)
+    create_csv_with_TMDB()
+
+    # get_P31_IDs(validate_p31=False, max_entries=2000)
+    # get_P31_IDs(validate_p31=True, max_entries=2000)
+
     # titles, summaries, genres = load_movie_data("processed_netflix.csv")
 
     # interstellar_summary = "Interstellar is a science fiction film directed by Christopher Nolan that follows a group of astronauts who travel through a wormhole in search of a new habitable planet as Earth faces ecological collapse."
