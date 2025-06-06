@@ -9,6 +9,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 from dotenv import load_dotenv
 from nomic import embed
 import csv
+import ast
 
 load_dotenv()
 TMDB_API_TOKEN = os.getenv("TMDB-API-READ-ACCESS-TOKEN") #note: for some reason in .env, if you do TMDB_API_READ_ACCESS_TOKEN it replaces - with _ in the value (dunno why)
@@ -344,19 +345,22 @@ def main():
     authenticate_tmdb()
     # get_P31_IDs(validate_p31=False, max_entries=2000)
     # get_P31_IDs(validate_p31=True, max_entries=2000)
-    titles, summaries, genre, date= load_media_data("cleaned_netflix_data.csv")
-    # interstellar_summary = "Interstellar is a science fiction film directed by Christopher Nolan that follows a group of astronauts who travel through a wormhole in search of a new habitable planet as Earth faces ecological collapse."
-    # query_summary = "A science fiction film exploring time dilation, love, and survival with emotional depth and theoretical physics."
+    titles, summaries, genres, date= load_media_data("cleaned_netflix_data.csv")
+    haiykuu = "Inspired by a small-statured pro volleyball player, Shouyou Hinata creates a volleyball team in his last year of middle school. Unfortunately the team is matched up against the ""King of the Court"" Tobio Kageyama's team in their first tournament and inevitably lose. After the crushing defeat, Hinata vows to surpass Kageyama. After entering high school, Hinata joins the volleyball team only to find that Tobio has also joined."
+    query_summary = "The story follows Shoyo Hinata, a short but passionate boy who dreams of becoming a great volleyball player despite his height disadvantage. Inspired by a pro nicknamed 'The Little Giant,' he revives a volleyball club at his middle school, only to suffer a crushing defeat by the tall and talented Tobio Kageyama, a genius setter. When Hinata enters Karasuno High School, he unexpectedly ends up on the same team as Kageyama. What starts as a tense rivalry turns into a powerful partnership, as their contrasting skills complement each other on the court. Together with their teammates, they aim to take Karasuno back to national prominence."
 
-    # # Remove Interstellar from corpus
-    # titles = titles[1:]
-    # summaries = summaries[1:]
+    corpus_embeddings = embed_texts(summaries)
+    haiykuu_emb = embed_texts([haiykuu])[0]
+    query_emb = embed_texts([query_summary])[0]
 
-    # corpus_embeddings = embed_texts(summaries)
-    # interstellar_emb = embed_texts([interstellar_summary])[0]
-    # query_emb = embed_texts([query_summary])[0]
+    # Flatten to first genre for coloring
 
-    # visualize_embeddings(titles, corpus_embeddings, query_emb, interstellar_emb)
+    cleaned_genres = [ast.literal_eval(g) if isinstance(g, str) else ["Unknown"] for g in genres]
+
+    simplified_genres = [g[0] if isinstance(g, list) and g else "Unknown" for g in cleaned_genres]
+
+    visualize_embeddings(titles, simplified_genres, corpus_embeddings, query_emb, haiykuu_emb)
+
 
 if __name__ == "__main__":
     main()
