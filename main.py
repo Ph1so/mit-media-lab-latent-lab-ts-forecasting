@@ -356,8 +356,8 @@ def visualize_embeddings(titles, genres, embeddings, highlight_groups, ref_emb=N
     plt.title("2D Visualization of Media Embeddings")
     plt.grid(True)
     plt.tight_layout()
-    plt.xlim(-0.1, 0.25)
-    plt.ylim(-0.125, 0.175)
+    # plt.xlim(-0.1, 0.25)
+    # plt.ylim(-0.125, 0.175)
 
     # --- Plot group boundaries and queries ---
     for i, (label, keyword, color, query_emb) in enumerate(highlight_groups):
@@ -382,12 +382,32 @@ def visualize_embeddings(titles, genres, embeddings, highlight_groups, ref_emb=N
 
     plt.show()
 
+def create_embedded_summary_csv(input_csv="cleaned_netflix_data.csv", output_csv="embedded_netflix_data.csv"):
+    df = pd.read_csv(input_csv)
+    df.dropna(subset=["Title", "Summary", "Genre", "Date"], inplace=True)
+
+    summaries = df["Summary"].tolist()
+    print(f"Embedding {len(summaries)} summaries...")
+
+    # Embed summaries in batches if needed (this handles large lists more safely)
+    BATCH_SIZE = 64
+    embeddings = []
+    for i in range(0, len(summaries), BATCH_SIZE):
+        batch = summaries[i:i+BATCH_SIZE]
+        batch_embeds = embed_texts(batch)
+        embeddings.extend(batch_embeds)
+
+    embedding_strings = [",".join(map(str, emb)) for emb in embeddings]
+    df["SummaryEmbedding"] = embedding_strings
+
+    df.to_csv(output_csv, index=False)
+    print(f"✅ Embedded CSV saved to: {output_csv}")
+
 # --- Main Pipeline ---
 def main():
     authenticate_tmdb()
-
+    create_embedded_summary_csv()
     titles, summaries, genres, date= load_media_data("cleaned_netflix_data.csv")
-    print(len(set(summaries))/len(summaries))
     cleaned_genres = [ast.literal_eval(g) if isinstance(g, str) else ["Unknown"] for g in genres]
     simplified_genres = [g[0] if isinstance(g, list) and g else "Unknown" for g in cleaned_genres]
 
@@ -424,7 +444,7 @@ def main():
     #     combined_texts.append(combined_text)
 
     # corpus_embeddings = embed_texts(combined_texts)
-
+    ref_emb = embed_texts(["DR.STONE"])[0]
     corpus_embeddings = embed_texts(summaries)
 
     visualize_embeddings(
@@ -432,7 +452,7 @@ def main():
         simplified_genres,
         corpus_embeddings,
         highlight_groups=highlight_groups,
-        ref_emb=None
+        ref_emb=ref_emb
 )
 
 if __name__ == "__main__":
