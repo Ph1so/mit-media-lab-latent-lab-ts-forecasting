@@ -95,13 +95,13 @@ def create_csv_with_TMDB_threaded(input_path, output_path, test_mode=False):
     print(f"✅ CSV file '{output_path}' created.")
 
 # --- Entrypoint ---
-def main(input_file="NetflixViewingHistory2.csv", output_file="cleaned_netflix_data.csv", test_mode=False):
+def main(input_file="NetflixViewingHistory.csv", output_file="cleaned_netflix_data.csv", test_mode=False):
     create_csv_with_TMDB_threaded(input_file, output_file, test_mode)
 
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description="Generate overview-enriched Netflix data CSV.")
-    parser.add_argument("--input", type=str, default="NetflixViewingHistory2.csv", help="Path to input Netflix CSV")
+    parser.add_argument("--input", type=str, default="NetflixViewingHistory.csv", help="Path to input Netflix CSV")
     parser.add_argument("--output", type=str, default="cleaned_netflix_data.csv", help="Output CSV file path")
     parser.add_argument("--test", action="store_true", help="Limit to first 100 entries for testing")
     args = parser.parse_args()
