@@ -247,7 +247,7 @@ def get_P31_IDs(validate_p31=False, logfile="p31_results.txt", max_entries = 200
     return p31_ids
 
 def create_csv_with_TMDB():
-    titles, dates = load_netflix_data("NetflixViewingHistory (1).csv")
+    titles, dates = load_netflix_data("NetflixViewingHistory2.csv")
     cleaned_titles = titles
 
     if len(cleaned_titles) != len(dates):
@@ -406,54 +406,55 @@ def create_embedded_summary_csv(input_csv="cleaned_netflix_data.csv", output_csv
 # --- Main Pipeline ---
 def main():
     authenticate_tmdb()
-    create_embedded_summary_csv()
-    titles, summaries, genres, date= load_media_data("cleaned_netflix_data.csv")
-    cleaned_genres = [ast.literal_eval(g) if isinstance(g, str) else ["Unknown"] for g in genres]
-    simplified_genres = [g[0] if isinstance(g, list) and g else "Unknown" for g in cleaned_genres]
+    create_csv_with_TMDB()
+#     create_embedded_summary_csv()
+#     titles, summaries, genres, date= load_media_data("cleaned_netflix_data.csv")
+#     cleaned_genres = [ast.literal_eval(g) if isinstance(g, str) else ["Unknown"] for g in genres]
+#     simplified_genres = [g[0] if isinstance(g, list) and g else "Unknown" for g in cleaned_genres]
 
-    red = "a science-fiction anime centered around Senku Ishigami, a genius high school student " \
-    "who wakes up thousands of years after a mysterious phenomenon turns all of humanity into stone."
+#     red = "a science-fiction anime centered around Senku Ishigami, a genius high school student " \
+#     "who wakes up thousands of years after a mysterious phenomenon turns all of humanity into stone."
 
-    blue = "an animated sci-fi fantasy series set in the universe of the video game League of Legends. " \
-    "It explores the origins of iconic champions and the conflict between two cities: " \
-    "the wealthy, tech-advanced Piltover and the oppressed, chaotic Zaun."
+#     blue = "an animated sci-fi fantasy series set in the universe of the video game League of Legends. " \
+#     "It explores the origins of iconic champions and the conflict between two cities: " \
+#     "the wealthy, tech-advanced Piltover and the oppressed, chaotic Zaun."
 
-    green = "Hundreds of cash-strapped players accept a strange invitation to compete in children's games " \
-    "for a tempting prize — but the stakes are deadly."
+#     green = "Hundreds of cash-strapped players accept a strange invitation to compete in children's games " \
+#     "for a tempting prize — but the stakes are deadly."
 
-    orange = "a teen sitcom that aired on Nickelodeon from 2010 to 2013. It follows Tori Vega, a talented " \
-    "teenager who unexpectedly finds herself attending Hollywood Arts High School, " \
-    "a performing arts school filled with eccentric and creative students."
+#     orange = "a teen sitcom that aired on Nickelodeon from 2010 to 2013. It follows Tori Vega, a talented " \
+#     "teenager who unexpectedly finds herself attending Hollywood Arts High School, " \
+#     "a performing arts school filled with eccentric and creative students."
 
-    red_em = embed_texts([red])[0]
-    blue_em = embed_texts([blue])[0]
-    green_em = embed_texts([green])[0]
-    orange_em = embed_texts([orange])[0]
+#     red_em = embed_texts([red])[0]
+#     blue_em = embed_texts([blue])[0]
+#     green_em = embed_texts([green])[0]
+#     orange_em = embed_texts([orange])[0]
 
-    highlight_groups = [
-        ("Dr. Stone Group", "DR.STONE", "red", red_em),
-        ("Arcane Group", "Arcane", "blue", blue_em),
-        ("Squid Game Group", "Squid Game", "green", green_em),
-        ("Victorious Group", "Victorious", "orange", orange_em)
-    ]
+#     highlight_groups = [
+#         ("Dr. Stone Group", "DR.STONE", "red", red_em),
+#         ("Arcane Group", "Arcane", "blue", blue_em),
+#         ("Squid Game Group", "Squid Game", "green", green_em),
+#         ("Victorious Group", "Victorious", "orange", orange_em)
+#     ]
 
-    # combined_texts = []
-    # for summary, genre_list in zip(summaries, cleaned_genres):
-    #     genre_str = ", ".join(genre_list)
-    #     combined_text = f"Genres: {genre_str}. Summary: {summary}"
-    #     combined_texts.append(combined_text)
+#     # combined_texts = []
+#     # for summary, genre_list in zip(summaries, cleaned_genres):
+#     #     genre_str = ", ".join(genre_list)
+#     #     combined_text = f"Genres: {genre_str}. Summary: {summary}"
+#     #     combined_texts.append(combined_text)
 
-    # corpus_embeddings = embed_texts(combined_texts)
-    ref_emb = embed_texts(["DR.STONE"])[0]
-    corpus_embeddings = embed_texts(summaries)
+#     # corpus_embeddings = embed_texts(combined_texts)
+#     ref_emb = embed_texts(["DR.STONE"])[0]
+#     corpus_embeddings = embed_texts(summaries)
 
-    visualize_embeddings(
-        titles,
-        simplified_genres,
-        corpus_embeddings,
-        highlight_groups=highlight_groups,
-        ref_emb=ref_emb
-)
+#     visualize_embeddings(
+#         titles,
+#         simplified_genres,
+#         corpus_embeddings,
+#         highlight_groups=highlight_groups,
+#         ref_emb=ref_emb
+# )
 
 if __name__ == "__main__":
     main()
