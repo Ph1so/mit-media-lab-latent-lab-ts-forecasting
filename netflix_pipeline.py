@@ -83,7 +83,7 @@ def create_csv_with_TMDB_threaded(input_path, output_path, test_mode=False):
                 _, _, overview, genres, poster_path = future.result()
                 overviews[i] = overview
                 genres_list[i] = genres
-                poster_paths[i]= poster_path
+                poster_paths[i]= "https://image.tmdb.org/t/p/w500"+poster_path
             except Exception as e:
                 print(f"⚠️ Error processing {titles[i]}: {e}")
                 overviews[i] = "No overview available"
@@ -104,7 +104,7 @@ def main(input_file="NetflixViewingHistory.csv", output_file="cleaned_netflix_da
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description="Generate overview-enriched Netflix data CSV.")
-    parser.add_argument("--input", type=str, default="./data/NetflixViewingHistory.csv", help="Path to input Netflix CSV")
+    parser.add_argument("--input", type=str, default="NetflixViewingHistory.csv", help="Path to input Netflix CSV")
     parser.add_argument("--output", type=str, default="cleaned_netflix_data.csv", help="Output CSV file path")
     parser.add_argument("--test", action="store_true", help="Limit to first 100 entries for testing")
     args = parser.parse_args()
