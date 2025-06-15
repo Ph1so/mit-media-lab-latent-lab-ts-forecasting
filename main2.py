@@ -55,6 +55,7 @@ def resolve_tmdb_data(original_title):
         if results:
             result = results[0]
             overview = result.get("overview", overview)
+            poster_path = result.get("poster_path", "NA")
             genre_ids = result.get("genre_ids", [])
             genre_map = TV_GENRES if result.get("media_type") == "tv" else MOVIE_GENRES
             genres = [genre_map.get(gid, "Unknown") for gid in genre_ids] or ["NA"]
@@ -64,7 +65,7 @@ def resolve_tmdb_data(original_title):
         current_title = ":".join(current_title.split(":")[:-1]).strip()
 
     print(f"✅ Final title used: {current_title}")
-    return original_title, current_title, overview, genres
+    return original_title, current_title, overview, genres, poster_path
 
 # --- CSV Writer ---
 def create_csv_with_TMDB_threaded(input_path, output_path, test_mode=False):
@@ -72,15 +73,17 @@ def create_csv_with_TMDB_threaded(input_path, output_path, test_mode=False):
 
     overviews = [None] * len(titles)
     genres_list = [None] * len(titles)
+    poster_paths = [None] * len(titles)
 
     with ThreadPoolExecutor(max_workers=50) as executor:
         futures = {executor.submit(resolve_tmdb_data, title): i for i, title in enumerate(titles)}
         for future in as_completed(futures):
             i = futures[future]
             try:
-                _, _, overview, genres = future.result()
+                _, _, overview, genres, poster_path = future.result()
                 overviews[i] = overview
                 genres_list[i] = genres
+                poster_paths[i]= poster_path
             except Exception as e:
                 print(f"⚠️ Error processing {titles[i]}: {e}")
                 overviews[i] = "No overview available"
@@ -88,9 +91,9 @@ def create_csv_with_TMDB_threaded(input_path, output_path, test_mode=False):
 
     with open(output_path, mode="w", newline='', encoding="utf-8") as f:
         writer = csv.writer(f)
-        writer.writerow(["Title", "Overview", "Genres", "Date"])
-        for title, overview, genre, date in zip(titles, overviews, genres_list, dates):
-            writer.writerow([title, overview, genre, date])
+        writer.writerow(["Title", "Overview", "Genres", "Poster_Path", "Date"])
+        for title, overview, genre, poster_path, date in zip(titles, overviews, genres_list, poster_paths, dates):
+            writer.writerow([title, overview, genre, poster_path, date])
 
     print(f"✅ CSV file '{output_path}' created.")
 
@@ -101,7 +104,7 @@ def main(input_file="NetflixViewingHistory.csv", output_file="cleaned_netflix_da
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description="Generate overview-enriched Netflix data CSV.")
-    parser.add_argument("--input", type=str, default="NetflixViewingHistory.csv", help="Path to input Netflix CSV")
+    parser.add_argument("--input", type=str, default="./data/NetflixViewingHistory.csv", help="Path to input Netflix CSV")
     parser.add_argument("--output", type=str, default="cleaned_netflix_data.csv", help="Output CSV file path")
     parser.add_argument("--test", action="store_true", help="Limit to first 100 entries for testing")
     args = parser.parse_args()
