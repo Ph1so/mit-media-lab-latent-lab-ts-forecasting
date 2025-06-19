@@ -104,7 +104,7 @@ def main(input_file="NetflixViewingHistory.csv", output_file="cleaned_netflix_da
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description="Generate overview-enriched Netflix data CSV.")
-    parser.add_argument("--input", type=str, default="NetflixViewingHistory.csv", help="Path to input Netflix CSV")
+    parser.add_argument("--input", type=str, default="data/NetflixViewingHistory.csv", help="Path to input Netflix CSV")
     parser.add_argument("--output", type=str, default="cleaned_netflix_data.csv", help="Output CSV file path")
     parser.add_argument("--test", action="store_true", help="Limit to first 100 entries for testing")
     args = parser.parse_args()
